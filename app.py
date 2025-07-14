@@ -38,13 +38,16 @@ df_critico_estado["ROI Pessimista"] = df_critico_estado["Proj. Matriculados Pess
 roi_medio = df_critico_estado["ROI Atual"].mean()
 df_critico_estado["Eficiência Relativa"] = df_critico_estado["ROI Atual"] / roi_medio
 
+# Simulação de meta ROI
+st.set_page_config("Análise Crítica por Estado", layout="wide")
+st.title("🚨 Análise de Estados com Baixo Volume de Inscrições")
 
-
-df_critico_estado["Investimento Ideal p/ Meta"] = df_critico_estado["Matriculados"] /  0.01
+meta_roi = st.slider("Defina o ROI desejado:", 0.001, 0.05, 0.01, step=0.001)
+df_critico_estado["Investimento Ideal p/ Meta"] = df_critico_estado["Matriculados"] / meta_roi
 df_critico_estado["Diferença de Investimento"] = df_critico_estado["Investimento Ideal p/ Meta"] - df_critico_estado["Investimento"]
 df_critico_estado["Alvo Bate Meta"] = df_critico_estado["Diferença de Investimento"].apply(lambda x: "🔺 Precisa aumentar" if x > 0 else "✅ ROI já atinge")
 
-# Renomear colunas antes de usar no restante do código
+# Renomear colunas antes de sugestões para compatibilidade
 df_critico_estado = df_critico_estado.rename(columns={
     "Matriculados": "Total de Matriculados",
     "Inscritos": "Total de Inscritos",
@@ -83,76 +86,67 @@ st.subheader("❌ Cidades com ROI igual a 0 (Sem Matrículas)")
 df_sem_retorno = df_critico[(df_critico["Matriculados"] == 0) & (df_critico["Investimento"] > 0)]
 st.dataframe(df_sem_retorno[["Cidade", "Estado", "Inscritos", "Matriculados", "Investimento"]])
 
+st.subheader("📉 Investimento x Total de Matriculados por Estado")
+fig_mat = px.bar(df_critico_estado, x="Estado", y="Total de Matriculados", color="Estado",
+                 text="Total de Matriculados", title="Total de Matriculados por Estado")
+fig_mat.update_traces(textposition='outside')
+st.plotly_chart(fig_mat, use_container_width=True)
 
-# Gráficos
-st.subheader("📊 Investimento x Total de Matriculados por Estado")
-fig_inv_vs_mat = px.scatter(
-    df_critico_estado,
-    x="Investimento Atual",
-    y="Total de Matriculados",
-    color="Estado",
-    size="Total de Matriculados",
-    hover_name="Estado",
-    text="Estado",
-    labels={"Investimento Atual": "Investimento (R$)", "Total de Matriculados": "Matriculados"},
-    title="Investimento versus Matriculados"
-)
-fig_inv_vs_mat.update_traces(textposition='top center')
-fig_inv_vs_mat.update_layout(xaxis_tickprefix="R$ ", showlegend=False)
-st.plotly_chart(fig_inv_vs_mat, use_container_width=True)
-
-st.subheader("📉 Investimento x Total de Inscritos por Estado")
-fig_inv_vs_insc = px.scatter(
-    df_critico_estado,
-    x="Investimento Atual",
-    y="Total de Inscritos",
-    color="Estado",
-    size="Total de Inscritos",
-    hover_name="Estado",
-    text="Estado",
-    labels={"Investimento Atual": "Investimento (R$)", "Total de Inscritos": "Inscritos"},
-    title="Investimento versus Inscritos"
-)
-fig_inv_vs_insc.update_traces(textposition='top center')
-fig_inv_vs_insc.update_layout(xaxis_tickprefix="R$ ", showlegend=False)
-st.plotly_chart(fig_inv_vs_insc, use_container_width=True)
+fig_inv = px.bar(df_critico_estado, x="Estado", y="Investimento Atual", color="Estado",
+                 text="Investimento Atual", title="Investimento Atual por Estado")
+fig_inv.update_traces(textposition='outside')
+st.plotly_chart(fig_inv, use_container_width=True)
 
 st.subheader("📈 Projeção de Inscritos para 6 Meses")
-fig_proj = px.bar(
-    df_critico_estado,
-    x="Estado",
-    y="Projeção de Inscritos (6 meses)",
-    text="Projeção de Inscritos (6 meses)",
-    title="Projeção de Inscrições em 6 Meses",
-    labels={"Projeção de Inscritos (6 meses)": "Quantidade"}
-)
-fig_proj.update_traces(textposition="outside", textfont_size=14)
-fig_proj.update_layout(xaxis_tickangle=-45, font=dict(size=14))
+fig_proj = px.bar(df_critico_estado, x="Estado", y="Projeção de Inscritos (6 meses)", color="Estado",
+                  text="Projeção de Inscritos (6 meses)", title="Projeção de Inscritos para 6 meses")
+fig_proj.update_traces(textposition='outside')
 st.plotly_chart(fig_proj, use_container_width=True)
 
-# Insights Automáticos
-st.subheader("🔎 Insights Automáticos")
-estado_mais_ineficiente = df_critico_estado.sort_values("ROI Atual").iloc[0]
-estado_melhor_custo = df_critico_estado.sort_values("CPI Médio").iloc[0]
-estado_maior_diferenca = df_critico_estado.sort_values("Diferença de Investimento", ascending=False).iloc[0]
+# Insights automáticos
+estado_menor_roi = df_critico_estado.loc[df_critico_estado["ROI Atual"].idxmin(), "Estado"]
+menor_cpi = df_critico_estado.loc[df_critico_estado["CPI Médio"].idxmin()]
+descompasso = df_critico_estado.loc[df_critico_estado["Diferença de Investimento"].idxmax()]
 
-st.markdown(f"➡️ O estado **{estado_mais_ineficiente['Estado']}** possui o ROI mais baixo atualmente: **{estado_mais_ineficiente['ROI Atual']:.4f}**.")
-st.markdown(f"💸 O menor custo por inscrito médio foi registrado em **{estado_melhor_custo['Estado']}**: **R${estado_melhor_custo['CPI Médio']:.2f}**.")
-st.markdown(f"🚨 O maior descompasso entre investimento atual e ideal para bater meta está em **{estado_maior_diferenca['Estado']}**: precisa de **R${estado_maior_diferenca['Diferença de Investimento']:.2f}** a mais.")
+st.subheader("🔍 Insights Automáticos")
+st.markdown(f"➡️ O estado **{estado_menor_roi}** possui o ROI mais baixo atualmente: **{df_critico_estado['ROI Atual'].min():.4f}**.")
+st.markdown(f"💸 O menor custo por inscrito médio foi registrado em **{menor_cpi['Estado']}**: R$**{menor_cpi['CPI Médio']:.2f}**.")
+st.markdown(f"🚨 O maior descompasso entre investimento atual e ideal para bater meta está em **{descompasso['Estado']}**: precisa de R$**{descompasso['Diferença de Investimento']:.2f}** a mais.")
 
-# Download dos dados como Excel
-st.subheader("📥 Download de Dados")
-excel_output = io.BytesIO()
-df_critico_estado.to_excel(excel_output, index=False)
-st.download_button(
-    label="📊 Baixar relatório completo (Excel)",
-    data=excel_output.getvalue(),
-    file_name="relatorio_critico_estados.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+# 🔎 Pior cidade por estado
+st.subheader("📉 Pior Cidade em ROI por Estado")
+df_city_roi = df_critico.copy()
+df_city_roi["ROI Cidade"] = df_city_roi["Matriculados"] / df_city_roi["Investimento"]
+df_city_roi = df_city_roi[df_city_roi["Investimento"] > 0]
+df_worst_city_by_state = df_city_roi.sort_values("ROI Cidade").groupby("Estado").first().reset_index()
+st.dataframe(df_worst_city_by_state[["Estado", "Cidade", "Inscritos", "Matriculados", "Investimento", "ROI Cidade"]])
+
+fig_worst = px.bar(
+    df_worst_city_by_state,
+    x="Cidade",
+    y="ROI Cidade",
+    color="Estado",
+    text="ROI Cidade",
+    title="Pior Cidade por Estado em ROI"
 )
+fig_worst.update_traces(texttemplate='%{text:.4f}', textposition='outside')
+fig_worst.update_layout(xaxis_tickangle=-45)
+st.plotly_chart(fig_worst, use_container_width=True)
 
-# Sugestões automáticas
-with st.expander("💡 Sugestões Automáticas Baseadas em ROI e CPM"):
-    for _, row in df_critico_estado.iterrows():
-        if "❗" in row["Alerta"]:
-            st.markdown(f"**{row['Estado']}** → {row['Sugerir Ação']} (ROI: {row['ROI Atual']:.4f}, CPM: R${row['CPM Médio']:.2f})")
+# 🚦 Análise visual de conversão
+st.subheader("⚠️ Cidades com Conversão Inferior a 20%")
+df_critico["Conversão %"] = (df_critico["Matriculados"] / df_critico["Inscritos"] * 100).round(2)
+df_baixa_conversao = df_critico[df_critico["Conversão %"] < 20]
+st.dataframe(df_baixa_conversao[["Cidade", "Estado", "Inscritos", "Matriculados", "Conversão %"]])
+
+# 🔝 Ranking de Eficiência Relativa
+st.subheader("📊 Ranking de Eficiência Relativa")
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown("### 🥇 Top 3 Estados mais eficientes")
+    st.dataframe(df_critico_estado.sort_values("Eficiência Relativa", ascending=False).head(3)[["Estado", "Eficiência Relativa"]])
+with col2:
+    st.markdown("### 🥵 Top 3 Estados menos eficientes")
+    st.dataframe(df_critico_estado.sort_values("Eficiência Relativa").head(3)[["Estado", "Eficiência Relativa"]])
+
+st.markdown(f"📊 **Média Nacional de Eficiência**: {roi_medio:.4f}")
